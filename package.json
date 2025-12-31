@@ -1,0 +1,24 @@
+{
+  "name": "base-arbitrage-bot",
+  "version": "1.0.0",
+  "description": "Arbitrage bot for Base chain WETH/USDC pair",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "keywords": [
+    "arbitrage",
+    "base",
+    "dex",
+    "uniswap",
+    "aerodrome"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ethers": "^6.9.0",
+    "dotenv": "^16.3.1"
+  }
+}

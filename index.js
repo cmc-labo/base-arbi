@@ -59,10 +59,10 @@ function displayArbitrage(arbitrage, amountIn) {
   console.log(`⛽ Estimated Gas Cost: ${gasCostETH} ETH`);
 
   // Convert gas cost to USDC equivalent (rough estimate)
-  const ethPriceInUSDC = arbitrage.quotes.find(q => q.amountOut > 0n);
-  if (ethPriceInUSDC) {
-    const ethPrice = Number(ethers.formatUnits(ethPriceInUSDC.amountOut, 6)) /
-                     Number(ethers.formatUnits(amountIn, 18));
+  const bestQuote = arbitrage.quotes.find(q => q.amountOut > 0n);
+  if (bestQuote) {
+    const amountInF = Number(ethers.formatUnits(amountIn, 18));
+    const ethPrice = Number(ethers.formatUnits(bestQuote.amountOut, 6)) / amountInF;
     const gasCostUSDC = Number(gasCostETH) * ethPrice;
     const netProfit = profitUSDC - gasCostUSDC;
 

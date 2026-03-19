@@ -142,9 +142,13 @@ export async function getAllQuotes(provider, tokenIn, tokenOut, amountIn) {
 export function calculateArbitrage(quotes, gasPrice, estimatedGasUnits) {
   if (quotes.length < 2) return null;
 
-  // Find best sell (highest output) and worst buy (lowest output) in O(n)
-  const bestSell = quotes.reduce((a, b) => b.amountOut > a.amountOut ? b : a);
-  const worstBuy = quotes.reduce((a, b) => b.amountOut < a.amountOut ? b : a);
+  // Find best sell and worst buy in a single pass
+  let bestSell = quotes[0];
+  let worstBuy = quotes[0];
+  for (let i = 1; i < quotes.length; i++) {
+    if (quotes[i].amountOut > bestSell.amountOut) bestSell = quotes[i];
+    if (quotes[i].amountOut < worstBuy.amountOut) worstBuy = quotes[i];
+  }
 
   // Calculate potential profit (in output token units)
   const profitBeforeGas = bestSell.amountOut - worstBuy.amountOut;

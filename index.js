@@ -20,9 +20,10 @@ function displayQuotes(quotes, amountIn) {
   console.log(`Input: ${formatToken(amountIn, 18, 'WETH')}`);
   console.log('─'.repeat(70));
 
+  const amountInF = Number(ethers.formatUnits(amountIn, 18));
   quotes.forEach((quote, index) => {
     const pricePerWETH = quote.amountOut > 0n
-      ? Number(ethers.formatUnits(quote.amountOut, 6)) / Number(ethers.formatUnits(amountIn, 18))
+      ? Number(ethers.formatUnits(quote.amountOut, 6)) / amountInF
       : 0;
 
     console.log(`\n${index + 1}. ${quote.dex}`);

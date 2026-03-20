@@ -3,6 +3,8 @@ import { ethers } from 'ethers';
 import { BASE_CONFIG, TOKENS, QUOTE_CONFIG } from './config.js';
 import { getAllQuotes, calculateArbitrage } from './quoter.js';
 
+const SEPARATOR = SEPARATOR;
+
 /**
  * Format token amount for display
  */
@@ -16,9 +18,9 @@ function formatToken(amount, decimals = 18, symbol = '') {
  */
 function displayQuotes(quotes, amountIn) {
   console.log('\n📊 Price Quotes:');
-  console.log('─'.repeat(70));
+  console.log(SEPARATOR);
   console.log(`Input: ${formatToken(amountIn, 18, 'WETH')}`);
-  console.log('─'.repeat(70));
+  console.log(SEPARATOR);
 
   const amountInF = Number(ethers.formatUnits(amountIn, 18));
   quotes.forEach((quote, index) => {
@@ -34,7 +36,7 @@ function displayQuotes(quotes, amountIn) {
     }
   });
 
-  console.log('\n' + '─'.repeat(70));
+  console.log('\n' + SEPARATOR);
 }
 
 /**
@@ -42,11 +44,11 @@ function displayQuotes(quotes, amountIn) {
  */
 function displayArbitrage(arbitrage, amountIn) {
   console.log('\n💰 Arbitrage Opportunity:');
-  console.log('─'.repeat(70));
+  console.log(SEPARATOR);
 
   if (!arbitrage || arbitrage.profitBeforeGas <= 0n) {
     console.log('❌ No profitable arbitrage opportunity found.');
-    console.log('─'.repeat(70));
+    console.log(SEPARATOR);
     return;
   }
 
@@ -79,7 +81,7 @@ function displayArbitrage(arbitrage, amountIn) {
     }
   }
 
-  console.log('─'.repeat(70));
+  console.log(SEPARATOR);
 }
 
 /**

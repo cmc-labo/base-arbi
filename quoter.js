@@ -48,6 +48,24 @@ const AERODROME_QUOTER_ABI = [
   },
 ];
 
+/* Contract instance cache keyed by provider */
+const uniswapQuoterCache = new WeakMap();
+const aerodromeQuoterCache = new WeakMap();
+
+function getUniswapQuoterContract(provider) {
+  if (!uniswapQuoterCache.has(provider)) {
+    uniswapQuoterCache.set(provider, new ethers.Contract(UNISWAP_V3.quoter, UNISWAP_QUOTER_ABI, provider));
+  }
+  return uniswapQuoterCache.get(provider);
+}
+
+function getAerodromeQuoterContract(provider) {
+  if (!aerodromeQuoterCache.has(provider)) {
+    aerodromeQuoterCache.set(provider, new ethers.Contract(AERODROME.quoter, AERODROME_QUOTER_ABI, provider));
+  }
+  return aerodromeQuoterCache.get(provider);
+}
+
 /**
  * Get quote from Uniswap V3
  * @param {ethers.Provider} provider
@@ -59,7 +77,7 @@ const AERODROME_QUOTER_ABI = [
  */
 export async function getUniswapV3Quote(provider, tokenIn, tokenOut, amountIn, fee = UNISWAP_V3.poolFee) {
   try {
-    const quoter = new ethers.Contract(UNISWAP_V3.quoter, UNISWAP_QUOTER_ABI, provider);
+    const quoter = getUniswapQuoterContract(provider);
 
     const params = {
       tokenIn,
@@ -91,7 +109,7 @@ export async function getUniswapV3Quote(provider, tokenIn, tokenOut, amountIn, f
  */
 export async function getAerodromeQuote(provider, tokenIn, tokenOut, amountIn) {
   try {
-    const quoter = new ethers.Contract(AERODROME.quoter, AERODROME_QUOTER_ABI, provider);
+    const quoter = getAerodromeQuoterContract(provider);
 
     const amountOut = await quoter.getAmountOut(amountIn, tokenIn, tokenOut);
 

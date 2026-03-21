@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import { TOKENS, UNISWAP_V3, AERODROME } from './config.js';
+import { UNISWAP_V3, AERODROME } from './config.js';
 
 // Uniswap V3 QuoterV2 ABI (quoteExactInputSingle function)
 const UNISWAP_QUOTER_ABI = [
@@ -89,10 +89,7 @@ export async function getUniswapV3Quote(provider, tokenIn, tokenOut, amountIn, f
 
     const [amountOut, , , gasEstimate] = await quoter.quoteExactInputSingle.staticCall(params);
 
-    return {
-      amountOut: BigInt(amountOut),
-      gasEstimate: BigInt(gasEstimate),
-    };
+    return { amountOut, gasEstimate };
   } catch (error) {
     console.error('Uniswap V3 quote error:', error.message);
     return { amountOut: 0n, gasEstimate: 0n };
@@ -113,9 +110,7 @@ export async function getAerodromeQuote(provider, tokenIn, tokenOut, amountIn) {
 
     const amountOut = await quoter.getAmountOut(amountIn, tokenIn, tokenOut);
 
-    return {
-      amountOut: BigInt(amountOut),
-    };
+    return { amountOut };
   } catch (error) {
     console.error('Aerodrome quote error:', error.message);
     return { amountOut: 0n };

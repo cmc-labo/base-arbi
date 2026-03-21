@@ -3,7 +3,8 @@ import { ethers } from 'ethers';
 import { BASE_CONFIG, TOKENS, QUOTE_CONFIG } from './config.js';
 import { getAllQuotes, calculateArbitrage } from './quoter.js';
 
-const SEPARATOR = SEPARATOR;
+const SEPARATOR = '─'.repeat(70);
+const HEADER   = HEADER;
 
 /**
  * Format token amount for display
@@ -89,10 +90,10 @@ function displayArbitrage(arbitrage, amountIn) {
  */
 async function main() {
   console.log('🔍 Base Chain Arbitrage Scanner');
-  console.log('═'.repeat(70));
+  console.log(HEADER);
   console.log(`RPC: ${BASE_CONFIG.rpcUrl}`);
   console.log(`Pair: WETH/USDC`);
-  console.log('═'.repeat(70));
+  console.log(HEADER);
 
   // Connect to Base network
   const provider = new ethers.JsonRpcProvider(BASE_CONFIG.rpcUrl);

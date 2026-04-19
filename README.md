@@ -19,7 +19,7 @@ Base チェーン上の WETH/USDC ペアの価格差を監視し、アービト�
 ### 1. 依存関係のインストール
 
 ```bash
-cd /home/hoge
+cd arbitrage
 npm install
 ```
 

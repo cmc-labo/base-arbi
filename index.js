@@ -4,7 +4,7 @@ import { BASE_CONFIG, TOKENS, QUOTE_CONFIG } from './config.js';
 import { getAllQuotes, calculateArbitrage } from './quoter.js';
 
 const SEPARATOR = '─'.repeat(70);
-const HEADER   = HEADER;
+const HEADER   = '═'.repeat(70);
 
 /**
  * Format token amount for display

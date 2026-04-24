@@ -35,4 +35,6 @@ export const QUOTE_CONFIG = {
   minProfitUSD: parseFloat(process.env.MIN_PROFIT_USD || '10'),
   // Gas estimate for arbitrage transaction
   estimatedGasUnits: 300000n,
+  // Polling interval in milliseconds (0 = run once)
+  scanIntervalMs: parseInt(process.env.SCAN_INTERVAL_MS || '30000', 10),
 };

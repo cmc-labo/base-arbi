@@ -85,6 +85,30 @@ function displayArbitrage(arbitrage, amountIn) {
   console.log(SEPARATOR);
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Single scan pass
+ */
+async function scan(provider) {
+  const timestamp = new Date().toLocaleTimeString();
+  console.log(`\n[${timestamp}] 🔄 Fetching quotes...`);
+
+  const feeData = await provider.getFeeData();
+  const gasPrice = feeData.gasPrice || 0n;
+  console.log(`⛽ Current gas price: ${ethers.formatUnits(gasPrice, 'gwei')} gwei`);
+
+  const amountIn = ethers.parseEther(QUOTE_CONFIG.amount);
+  const quotes = await getAllQuotes(provider, TOKENS.WETH, TOKENS.USDC, amountIn);
+
+  displayQuotes(quotes, amountIn);
+
+  const arbitrage = calculateArbitrage(quotes, gasPrice, QUOTE_CONFIG.estimatedGasUnits);
+  displayArbitrage(arbitrage, amountIn);
+}
+
 /**
  * Main function
  */
@@ -93,45 +117,46 @@ async function main() {
   console.log(HEADER);
   console.log(`RPC: ${BASE_CONFIG.rpcUrl}`);
   console.log(`Pair: WETH/USDC`);
+  if (QUOTE_CONFIG.scanIntervalMs > 0) {
+    console.log(`Interval: ${QUOTE_CONFIG.scanIntervalMs / 1000}s`);
+  }
   console.log(HEADER);
 
-  // Connect to Base network
   const provider = new ethers.JsonRpcProvider(BASE_CONFIG.rpcUrl);
 
-  try {
-    // Verify connection
-    const network = await provider.getNetwork();
-    console.log(`✅ Connected to chain ID: ${network.chainId}`);
+  const network = await provider.getNetwork();
+  console.log(`✅ Connected to chain ID: ${network.chainId}`);
 
-    // Get current gas price
-    const feeData = await provider.getFeeData();
-    const gasPrice = feeData.gasPrice || 0n;
-    console.log(`⛽ Current gas price: ${ethers.formatUnits(gasPrice, 'gwei')} gwei`);
+  if (QUOTE_CONFIG.scanIntervalMs > 0) {
+    console.log('Press Ctrl+C to stop.\n');
 
-    // Parse quote amount
-    const amountIn = ethers.parseEther(QUOTE_CONFIG.amount);
+    process.on('SIGINT', () => {
+      console.log('\n\n👋 Stopped.');
+      process.exit(0);
+    });
 
-    // Get quotes from all DEXes
-    console.log('\n🔄 Fetching quotes...');
-    const quotes = await getAllQuotes(provider, TOKENS.WETH, TOKENS.USDC, amountIn);
-
-    // Display quotes
-    displayQuotes(quotes, amountIn);
-
-    // Calculate arbitrage
-    const arbitrage = calculateArbitrage(quotes, gasPrice, QUOTE_CONFIG.estimatedGasUnits);
-
-    // Display arbitrage opportunity
-    displayArbitrage(arbitrage, amountIn);
-
-  } catch (error) {
-    console.error('\n❌ Error:', error.message);
-    if (error.code === 'NETWORK_ERROR') {
-      console.error('   → Check your RPC URL in .env file');
+    while (true) {
+      try {
+        await scan(provider);
+      } catch (error) {
+        console.error('\n❌ Scan error:', error.message);
+        if (error.code === 'NETWORK_ERROR') {
+          console.error('   → Check your RPC URL in .env file');
+        }
+      }
+      await sleep(QUOTE_CONFIG.scanIntervalMs);
     }
+  } else {
+    try {
+      await scan(provider);
+    } catch (error) {
+      console.error('\n❌ Error:', error.message);
+      if (error.code === 'NETWORK_ERROR') {
+        console.error('   → Check your RPC URL in .env file');
+      }
+    }
+    console.log('\n');
   }
-
-  console.log('\n');
 }
 
 // Run the scanner

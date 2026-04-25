@@ -23,7 +23,7 @@ export const UNISWAP_V3 = {
 export const AERODROME = {
   name: 'Aerodrome',
   quoter: '0x254cF9E1E6e233aa1AC962CB9B05b2cfeAaE15b0', // Aerodrome Quoter
-  router: '0xcF77a3Ba9A5CA04BB4E9e3d4D3e7B4d4c7d4e5E3', // Aerodrome Router (需要確認)
+  router: '0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43', // Aerodrome Router (verified on BaseScan)
   factory: '0x420DD381b31aEf6683db6B902084cB0FFECe40Da',
 };
 

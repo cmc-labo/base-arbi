@@ -16,7 +16,7 @@ export const UNISWAP_V3 = {
   quoter: '0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a', // QuoterV2
   router: '0x2626664c2603336E57B271c5C0b26F421741e481', // SwapRouter02
   factory: '0x33128a8fC17869897dcE68Ed026d694621f6FDfD',
-  poolFee: 500, // 0.05% fee tier (WETH/USDC typically uses 500 or 3000)
+  poolFees: [500, 3000, 10000], // 0.05% / 0.3% / 1% — best quote selected at runtime
 };
 
 // Aerodrome on Base

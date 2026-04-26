@@ -66,34 +66,31 @@ function getAerodromeQuoterContract(provider) {
   return aerodromeQuoterCache.get(provider);
 }
 
-/**
- * Get quote from Uniswap V3
- * @param {ethers.Provider} provider
- * @param {string} tokenIn - Input token address
- * @param {string} tokenOut - Output token address
- * @param {bigint} amountIn - Amount in (wei)
- * @param {number} fee - Pool fee tier
- * @returns {Promise<{amountOut: bigint, gasEstimate: bigint}>}
- */
-export async function getUniswapV3Quote(provider, tokenIn, tokenOut, amountIn, fee = UNISWAP_V3.poolFee) {
+async function getUniswapV3QuoteForFee(provider, tokenIn, tokenOut, amountIn, fee) {
   try {
     const quoter = getUniswapQuoterContract(provider);
-
-    const params = {
-      tokenIn,
-      tokenOut,
-      amountIn,
-      fee,
-      sqrtPriceLimitX96: 0, // No price limit
-    };
-
-    const [amountOut, , , gasEstimate] = await quoter.quoteExactInputSingle.staticCall(params);
-
-    return { amountOut, gasEstimate };
-  } catch (error) {
-    console.error('Uniswap V3 quote error:', error.message);
-    return { amountOut: 0n, gasEstimate: 0n };
+    const [amountOut, , , gasEstimate] = await quoter.quoteExactInputSingle.staticCall({
+      tokenIn, tokenOut, amountIn, fee, sqrtPriceLimitX96: 0,
+    });
+    return { amountOut, gasEstimate, fee };
+  } catch {
+    return { amountOut: 0n, gasEstimate: 0n, fee };
   }
+}
+
+/**
+ * Get best quote from Uniswap V3 across all configured fee tiers
+ * @param {ethers.Provider} provider
+ * @param {string} tokenIn
+ * @param {string} tokenOut
+ * @param {bigint} amountIn
+ * @returns {Promise<{amountOut: bigint, gasEstimate: bigint, fee: number}>}
+ */
+export async function getUniswapV3Quote(provider, tokenIn, tokenOut, amountIn) {
+  const results = await Promise.all(
+    UNISWAP_V3.poolFees.map(fee => getUniswapV3QuoteForFee(provider, tokenIn, tokenOut, amountIn, fee))
+  );
+  return results.reduce((best, cur) => cur.amountOut > best.amountOut ? cur : best, results[0]);
 }
 
 /**
@@ -136,6 +133,7 @@ export async function getAllQuotes(provider, tokenIn, tokenOut, amountIn) {
       dex: UNISWAP_V3.name,
       amountOut: uniswapQuote.amountOut,
       gasEstimate: uniswapQuote.gasEstimate,
+      fee: uniswapQuote.fee,
     },
     {
       dex: AERODROME.name,

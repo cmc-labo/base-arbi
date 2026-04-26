@@ -29,7 +29,8 @@ function displayQuotes(quotes, amountIn) {
       ? Number(ethers.formatUnits(quote.amountOut, 6)) / amountInF
       : 0;
 
-    console.log(`\n${index + 1}. ${quote.dex}`);
+    const feeTierStr = quote.fee != null ? ` (${quote.fee / 10000}%)` : '';
+    console.log(`\n${index + 1}. ${quote.dex}${feeTierStr}`);
     console.log(`   Output: ${formatToken(quote.amountOut, 6, 'USDC')}`);
     console.log(`   Price: ${pricePerWETH.toFixed(2)} USDC per WETH`);
     if (quote.gasEstimate > 0n) {

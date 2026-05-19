@@ -151,14 +151,17 @@ export async function getAllQuotes(provider, tokenIn, tokenOut, amountIn) {
  * @returns {Object|null}
  */
 export function calculateArbitrage(quotes, gasPrice, estimatedGasUnits) {
-  if (quotes.length < 2) return null;
+  // Exclude failed quotes (0 output) — treating them as valid would
+  // produce phantom profit (e.g. "buy free WETH on failed DEX").
+  const validQuotes = quotes.filter(q => q.amountOut > 0n);
+  if (validQuotes.length < 2) return null;
 
   // Find best sell and worst buy in a single pass
-  let bestSell = quotes[0];
-  let worstBuy = quotes[0];
-  for (let i = 1; i < quotes.length; i++) {
-    if (quotes[i].amountOut > bestSell.amountOut) bestSell = quotes[i];
-    if (quotes[i].amountOut < worstBuy.amountOut) worstBuy = quotes[i];
+  let bestSell = validQuotes[0];
+  let worstBuy = validQuotes[0];
+  for (let i = 1; i < validQuotes.length; i++) {
+    if (validQuotes[i].amountOut > bestSell.amountOut) bestSell = validQuotes[i];
+    if (validQuotes[i].amountOut < worstBuy.amountOut) worstBuy = validQuotes[i];
   }
 
   // Calculate potential profit (in output token units)

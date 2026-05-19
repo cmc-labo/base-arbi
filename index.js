@@ -64,8 +64,13 @@ function displayArbitrage(arbitrage, amountIn) {
   console.log(`⛽ Estimated Gas Cost: ${gasCostETH} ETH`);
 
   // Convert gas cost to USDC equivalent (rough estimate)
-  const bestQuote = arbitrage.quotes.find(q => q.amountOut > 0n);
-  if (bestQuote) {
+  // Use the best (highest) output quote for the ETH price so the estimate
+  // matches what the sell leg would actually realise.
+  const bestQuote = arbitrage.quotes.reduce(
+    (best, q) => (q.amountOut > (best?.amountOut ?? 0n) ? q : best),
+    null,
+  );
+  if (bestQuote && bestQuote.amountOut > 0n) {
     const amountInF = Number(ethers.formatUnits(amountIn, 18));
     const ethPrice = Number(ethers.formatUnits(bestQuote.amountOut, 6)) / amountInF;
     const gasCostUSDC = Number(gasCostETH) * ethPrice;

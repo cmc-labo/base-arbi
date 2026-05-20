@@ -48,7 +48,13 @@ function displayArbitrage(arbitrage, amountIn) {
   console.log('\n💰 Arbitrage Opportunity:');
   console.log(SEPARATOR);
 
-  if (!arbitrage || arbitrage.profitBeforeGas <= 0n) {
+  if (!arbitrage) {
+    console.log('⚠️  Insufficient valid quotes — one or more DEXes failed to respond.');
+    console.log(SEPARATOR);
+    return;
+  }
+
+  if (arbitrage.profitBeforeGas <= 0n) {
     console.log('❌ No profitable arbitrage opportunity found.');
     console.log(SEPARATOR);
     return;
@@ -103,7 +109,10 @@ async function scan(provider) {
   console.log(`\n[${timestamp}] 🔄 Fetching quotes...`);
 
   const feeData = await provider.getFeeData();
-  const gasPrice = feeData.gasPrice || 0n;
+  const gasPrice = feeData.gasPrice ?? 0n;
+  if (gasPrice === 0n) {
+    console.warn('⚠️  Gas price unavailable — gas cost estimate will be 0 (results may be misleading)');
+  }
   console.log(`⛽ Current gas price: ${ethers.formatUnits(gasPrice, 'gwei')} gwei`);
 
   const amountIn = ethers.parseEther(QUOTE_CONFIG.amount);

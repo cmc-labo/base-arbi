@@ -63,6 +63,14 @@ function displayArbitrage(arbitrage, amountIn) {
   const profitUSDC = Number(ethers.formatUnits(arbitrage.profitBeforeGas, 6));
   const gasCostETH = ethers.formatUnits(arbitrage.gasCost, 18);
 
+  // Price spread % = profit / buy-side price
+  const buyQuote  = arbitrage.quotes.find(q => q.dex === arbitrage.buyFrom);
+  const sellQuote = arbitrage.quotes.find(q => q.dex === arbitrage.sellTo);
+  if (buyQuote && sellQuote && buyQuote.amountOut > 0n) {
+    const spreadPct = (Number(sellQuote.amountOut - buyQuote.amountOut) / Number(buyQuote.amountOut)) * 100;
+    console.log(`\n📐 Price Spread: ${spreadPct.toFixed(4)}%`);
+  }
+
   console.log(`\n📈 Strategy:`);
   console.log(`   1. Buy ${formatToken(amountIn, 18, 'WETH')} on ${arbitrage.buyFrom}`);
   console.log(`   2. Sell on ${arbitrage.sellTo}`);
@@ -103,10 +111,14 @@ function sleep(ms) {
 
 /**
  * Single scan pass
+ * @param {ethers.Provider} provider
+ * @param {number} scanCount - 1-based scan number (0 = run-once, no label)
  */
-async function scan(provider) {
+async function scan(provider, scanCount = 0) {
   const timestamp = new Date().toLocaleTimeString();
-  console.log(`\n[${timestamp}] 🔄 Fetching quotes...`);
+  const scanLabel = scanCount > 0 ? ` #${scanCount}` : '';
+  console.log(`\n[${timestamp}] 🔄 Fetching quotes${scanLabel}...`);
+  const scanStart = Date.now();
 
   const feeData = await provider.getFeeData();
   const gasPrice = feeData.gasPrice ?? 0n;
@@ -122,6 +134,9 @@ async function scan(provider) {
 
   const arbitrage = calculateArbitrage(quotes, gasPrice, QUOTE_CONFIG.estimatedGasUnits);
   displayArbitrage(arbitrage, amountIn);
+
+  const elapsed = ((Date.now() - scanStart) / 1000).toFixed(1);
+  console.log(`\n⏱  Scan completed in ${elapsed}s`);
 }
 
 /**
@@ -150,9 +165,10 @@ async function main() {
       process.exit(0);
     });
 
+    let scanCount = 0;
     while (true) {
       try {
-        await scan(provider);
+        await scan(provider, ++scanCount);
       } catch (error) {
         console.error('\n❌ Scan error:', error.message);
         if (error.code === 'NETWORK_ERROR') {

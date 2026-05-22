@@ -14,10 +14,17 @@ function formatToken(amount, decimals = 18, symbol = '') {
   return symbol ? `${formatted} ${symbol}` : formatted;
 }
 
+function trendIndicator(current, prev) {
+  if (prev === undefined) return '';
+  const delta = current - prev;
+  if (Math.abs(delta) < 0.01) return ' ─';
+  return delta > 0 ? ' ▲' : ' ▼';
+}
+
 /**
  * Display quotes from all DEXes
  */
-function displayQuotes(quotes, amountIn) {
+function displayQuotes(quotes, amountIn, prevPrices = {}) {
   console.log('\n📊 Price Quotes:');
   console.log(SEPARATOR);
   console.log(`Input: ${formatToken(amountIn, 18, 'WETH')}`);
@@ -32,7 +39,7 @@ function displayQuotes(quotes, amountIn) {
     const feeTierStr = quote.fee != null ? ` (${quote.fee / 10000}%)` : '';
     console.log(`\n${index + 1}. ${quote.dex}${feeTierStr}`);
     console.log(`   Output: ${formatToken(quote.amountOut, 6, 'USDC')}`);
-    console.log(`   Price: ${pricePerWETH.toFixed(2)} USDC per WETH`);
+    console.log(`   Price: ${pricePerWETH.toFixed(2)} USDC per WETH${trendIndicator(pricePerWETH, prevPrices[quote.dex])}`);
     if (quote.gasEstimate > 0n) {
       console.log(`   Gas Estimate: ${quote.gasEstimate.toString()}`);
     }
@@ -51,13 +58,13 @@ function displayArbitrage(arbitrage, amountIn) {
   if (!arbitrage) {
     console.log('⚠️  Insufficient valid quotes — one or more DEXes failed to respond.');
     console.log(SEPARATOR);
-    return;
+    return null;
   }
 
   if (arbitrage.profitBeforeGas <= 0n) {
     console.log('❌ No profitable arbitrage opportunity found.');
     console.log(SEPARATOR);
-    return;
+    return null;
   }
 
   const profitUSDC = Number(ethers.formatUnits(arbitrage.profitBeforeGas, 6));
@@ -84,11 +91,12 @@ function displayArbitrage(arbitrage, amountIn) {
     (best, q) => (q.amountOut > (best?.amountOut ?? 0n) ? q : best),
     null,
   );
+  let netProfit = null;
   if (bestQuote && bestQuote.amountOut > 0n) {
     const amountInF = Number(ethers.formatUnits(amountIn, 18));
     const ethPrice = Number(ethers.formatUnits(bestQuote.amountOut, 6)) / amountInF;
     const gasCostUSDC = Number(gasCostETH) * ethPrice;
-    const netProfit = profitUSDC - gasCostUSDC;
+    netProfit = profitUSDC - gasCostUSDC;
 
     console.log(`⛽ Gas Cost in USDC: ~${gasCostUSDC.toFixed(4)} USDC`);
     console.log(`\n✨ Net Profit: ${netProfit.toFixed(4)} USDC`);
@@ -103,6 +111,7 @@ function displayArbitrage(arbitrage, amountIn) {
   }
 
   console.log(SEPARATOR);
+  return netProfit;
 }
 
 function sleep(ms) {
@@ -114,7 +123,7 @@ function sleep(ms) {
  * @param {ethers.Provider} provider
  * @param {number} scanCount - 1-based scan number (0 = run-once, no label)
  */
-async function scan(provider, scanCount = 0) {
+async function scan(provider, scanCount = 0, prevPrices = {}) {
   const timestamp = new Date().toLocaleTimeString();
   const scanLabel = scanCount > 0 ? ` #${scanCount}` : '';
   console.log(`\n[${timestamp}] 🔄 Fetching quotes${scanLabel}...`);
@@ -130,13 +139,41 @@ async function scan(provider, scanCount = 0) {
   const amountIn = ethers.parseEther(QUOTE_CONFIG.amount);
   const quotes = await getAllQuotes(provider, TOKENS.WETH, TOKENS.USDC, amountIn);
 
-  displayQuotes(quotes, amountIn);
+  displayQuotes(quotes, amountIn, prevPrices);
 
   const arbitrage = calculateArbitrage(quotes, gasPrice, QUOTE_CONFIG.estimatedGasUnits);
-  displayArbitrage(arbitrage, amountIn);
+  const netProfit = displayArbitrage(arbitrage, amountIn);
 
-  const elapsed = ((Date.now() - scanStart) / 1000).toFixed(1);
-  console.log(`\n⏱  Scan completed in ${elapsed}s`);
+  const elapsed = (Date.now() - scanStart) / 1000;
+  console.log(`\n⏱  Scan completed in ${elapsed.toFixed(1)}s`);
+
+  const amountInF = Number(ethers.formatUnits(amountIn, 18));
+  const prices = {};
+  quotes.forEach(q => {
+    if (q.amountOut > 0n) {
+      prices[q.dex] = Number(ethers.formatUnits(q.amountOut, 6)) / amountInF;
+    }
+  });
+
+  return { netProfit, elapsed, prices };
+}
+
+function displaySummary(stats) {
+  console.log('\n' + HEADER);
+  console.log('📊 Session Summary');
+  console.log(HEADER);
+  console.log(`  Total scans:      ${stats.totalScans}`);
+  console.log(`  With opportunity: ${stats.profitableScans}`);
+  if (stats.totalScans > 0) {
+    const avgTime = (stats.totalElapsed / stats.totalScans).toFixed(1);
+    console.log(`  Avg scan time:    ${avgTime}s`);
+  }
+  if (stats.bestNetProfit !== null) {
+    console.log(`  Best net profit:  ${stats.bestNetProfit.toFixed(4)} USDC`);
+  } else {
+    console.log(`  Best net profit:  —`);
+  }
+  console.log(HEADER + '\n');
 }
 
 /**
@@ -160,15 +197,28 @@ async function main() {
   if (QUOTE_CONFIG.scanIntervalMs > 0) {
     console.log('Press Ctrl+C to stop.\n');
 
+    const stats = { totalScans: 0, profitableScans: 0, bestNetProfit: null, totalElapsed: 0 };
+
     process.on('SIGINT', () => {
       console.log('\n\n👋 Stopped.');
+      displaySummary(stats);
       process.exit(0);
     });
 
     let scanCount = 0;
+    let prevPrices = {};
     while (true) {
       try {
-        await scan(provider, ++scanCount);
+        const result = await scan(provider, ++scanCount, prevPrices);
+        stats.totalScans++;
+        stats.totalElapsed += result.elapsed;
+        prevPrices = result.prices;
+        if (result.netProfit !== null) {
+          stats.profitableScans++;
+          if (stats.bestNetProfit === null || result.netProfit > stats.bestNetProfit) {
+            stats.bestNetProfit = result.netProfit;
+          }
+        }
       } catch (error) {
         console.error('\n❌ Scan error:', error.message);
         if (error.code === 'NETWORK_ERROR') {

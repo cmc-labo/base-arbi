@@ -18,7 +18,8 @@ function trendIndicator(current, prev) {
   if (prev === undefined) return '';
   const delta = current - prev;
   if (Math.abs(delta) < 0.01) return ' ─';
-  return delta > 0 ? ' ▲' : ' ▼';
+  const sign = delta > 0 ? '+' : '';
+  return ` ${delta > 0 ? '▲' : '▼'} (${sign}${delta.toFixed(2)})`;
 }
 
 /**
@@ -129,12 +130,15 @@ async function scan(provider, scanCount = 0, prevPrices = {}) {
   console.log(`\n[${timestamp}] 🔄 Fetching quotes${scanLabel}...`);
   const scanStart = Date.now();
 
-  const feeData = await provider.getFeeData();
+  const [feeData, blockNumber] = await Promise.all([
+    provider.getFeeData(),
+    provider.getBlockNumber(),
+  ]);
   const gasPrice = feeData.gasPrice ?? 0n;
   if (gasPrice === 0n) {
     console.warn('⚠️  Gas price unavailable — gas cost estimate will be 0 (results may be misleading)');
   }
-  console.log(`⛽ Current gas price: ${ethers.formatUnits(gasPrice, 'gwei')} gwei`);
+  console.log(`⛽ Gas: ${ethers.formatUnits(gasPrice, 'gwei')} gwei  |  Block: ${blockNumber}`);
 
   const amountIn = ethers.parseEther(QUOTE_CONFIG.amount);
   const quotes = await getAllQuotes(provider, TOKENS.WETH, TOKENS.USDC, amountIn);
@@ -155,7 +159,16 @@ async function scan(provider, scanCount = 0, prevPrices = {}) {
     }
   });
 
-  return { netProfit, elapsed, prices };
+  let spreadPct = null;
+  if (arbitrage && arbitrage.profitBeforeGas > 0n) {
+    const buyQ  = arbitrage.quotes.find(q => q.dex === arbitrage.buyFrom);
+    const sellQ = arbitrage.quotes.find(q => q.dex === arbitrage.sellTo);
+    if (buyQ && sellQ && buyQ.amountOut > 0n) {
+      spreadPct = (Number(sellQ.amountOut - buyQ.amountOut) / Number(buyQ.amountOut)) * 100;
+    }
+  }
+
+  return { netProfit, elapsed, prices, spreadPct };
 }
 
 function displaySummary(stats) {
@@ -172,6 +185,9 @@ function displaySummary(stats) {
     console.log(`  Best net profit:  ${stats.bestNetProfit.toFixed(4)} USDC`);
   } else {
     console.log(`  Best net profit:  —`);
+  }
+  if (stats.maxSpread !== null) {
+    console.log(`  Max spread seen:  ${stats.maxSpread.toFixed(4)}%`);
   }
   console.log(HEADER + '\n');
 }
@@ -197,7 +213,7 @@ async function main() {
   if (QUOTE_CONFIG.scanIntervalMs > 0) {
     console.log('Press Ctrl+C to stop.\n');
 
-    const stats = { totalScans: 0, profitableScans: 0, bestNetProfit: null, totalElapsed: 0 };
+    const stats = { totalScans: 0, profitableScans: 0, bestNetProfit: null, totalElapsed: 0, maxSpread: null };
 
     process.on('SIGINT', () => {
       console.log('\n\n👋 Stopped.');
@@ -217,6 +233,11 @@ async function main() {
           stats.profitableScans++;
           if (stats.bestNetProfit === null || result.netProfit > stats.bestNetProfit) {
             stats.bestNetProfit = result.netProfit;
+          }
+        }
+        if (result.spreadPct !== null) {
+          if (stats.maxSpread === null || result.spreadPct > stats.maxSpread) {
+            stats.maxSpread = result.spreadPct;
           }
         }
       } catch (error) {

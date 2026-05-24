@@ -189,6 +189,10 @@ function displaySummary(stats) {
   if (stats.maxSpread !== null) {
     console.log(`  Max spread seen:  ${stats.maxSpread.toFixed(4)}%`);
   }
+  const totalSec = Math.round((Date.now() - stats.startedAt) / 1000);
+  const mm = Math.floor(totalSec / 60);
+  const ss = totalSec % 60;
+  console.log(`  Session duration: ${mm > 0 ? `${mm}m ` : ''}${ss}s`);
   console.log(HEADER + '\n');
 }
 
@@ -213,7 +217,7 @@ async function main() {
   if (QUOTE_CONFIG.scanIntervalMs > 0) {
     console.log('Press Ctrl+C to stop.\n');
 
-    const stats = { totalScans: 0, profitableScans: 0, bestNetProfit: null, totalElapsed: 0, maxSpread: null };
+    const stats = { totalScans: 0, profitableScans: 0, bestNetProfit: null, totalElapsed: 0, maxSpread: null, startedAt: Date.now() };
 
     process.on('SIGINT', () => {
       console.log('\n\n👋 Stopped.');
@@ -246,6 +250,8 @@ async function main() {
           console.error('   → Check your RPC URL in .env file');
         }
       }
+      const nextAt = new Date(Date.now() + QUOTE_CONFIG.scanIntervalMs).toLocaleTimeString();
+      console.log(`   ⏰ Next scan at ${nextAt}`);
       await sleep(QUOTE_CONFIG.scanIntervalMs);
     }
   } else {

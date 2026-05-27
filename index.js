@@ -180,6 +180,8 @@ function displaySummary(stats) {
   if (stats.totalScans > 0) {
     const avgTime = (stats.totalElapsed / stats.totalScans).toFixed(1);
     console.log(`  Avg scan time:    ${avgTime}s`);
+    const oppRate = ((stats.profitableScans / stats.totalScans) * 100).toFixed(1);
+    console.log(`  Opportunity rate: ${oppRate}%`);
   }
   if (stats.bestNetProfit !== null) {
     console.log(`  Best net profit:  ${stats.bestNetProfit.toFixed(4)} USDC`);

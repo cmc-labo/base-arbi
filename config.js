@@ -27,6 +27,11 @@ export const AERODROME = {
   factory: '0x420DD381b31aEf6683db6B902084cB0FFECe40Da',
 };
 
+// Log Configuration
+export const LOG_CONFIG = {
+  logDir: process.env.LOG_DIR || 'logs',
+};
+
 // Quote Configuration
 export const QUOTE_CONFIG = {
   // Amount of WETH to quote (in ether units)

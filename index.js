@@ -1,7 +1,8 @@
 import 'dotenv/config';
 import { ethers } from 'ethers';
-import { BASE_CONFIG, TOKENS, QUOTE_CONFIG } from './config.js';
+import { BASE_CONFIG, TOKENS, QUOTE_CONFIG, LOG_CONFIG } from './config.js';
 import { getAllQuotes, calculateArbitrage } from './quoter.js';
+import { initLogger, logScan } from './logger.js';
 
 const SEPARATOR = '─'.repeat(70);
 const HEADER   = '═'.repeat(70);
@@ -74,8 +75,9 @@ function displayArbitrage(arbitrage, amountIn) {
   // Price spread % = profit / buy-side price
   const buyQuote  = arbitrage.quotes.find(q => q.dex === arbitrage.buyFrom);
   const sellQuote = arbitrage.quotes.find(q => q.dex === arbitrage.sellTo);
+  let spreadPct = null;
   if (buyQuote && sellQuote && buyQuote.amountOut > 0n) {
-    const spreadPct = (Number(sellQuote.amountOut - buyQuote.amountOut) / Number(buyQuote.amountOut)) * 100;
+    spreadPct = (Number(sellQuote.amountOut - buyQuote.amountOut) / Number(buyQuote.amountOut)) * 100;
     console.log(`\n📐 Price Spread: ${spreadPct.toFixed(4)}%`);
   }
 
@@ -93,10 +95,11 @@ function displayArbitrage(arbitrage, amountIn) {
     null,
   );
   let netProfit = null;
+  let gasCostUSDC = null;
   if (bestQuote && bestQuote.amountOut > 0n) {
     const amountInF = Number(ethers.formatUnits(amountIn, 18));
     const ethPrice = Number(ethers.formatUnits(bestQuote.amountOut, 6)) / amountInF;
-    const gasCostUSDC = Number(gasCostETH) * ethPrice;
+    gasCostUSDC = Number(gasCostETH) * ethPrice;
     netProfit = profitUSDC - gasCostUSDC;
 
     console.log(`⛽ Gas Cost in USDC: ~${gasCostUSDC.toFixed(4)} USDC`);
@@ -112,7 +115,7 @@ function displayArbitrage(arbitrage, amountIn) {
   }
 
   console.log(SEPARATOR);
-  return netProfit;
+  return { netProfit, spreadPct, profitBeforeGasUsdc: profitUSDC, gasCostEth: Number(gasCostETH), gasCostUsdc: gasCostUSDC };
 }
 
 function sleep(ms) {
@@ -125,9 +128,11 @@ function sleep(ms) {
  * @param {number} scanCount - 1-based scan number (0 = run-once, no label)
  */
 async function scan(provider, scanCount = 0, prevPrices = {}) {
-  const timestamp = new Date().toLocaleTimeString();
+  const now = new Date();
+  const timestamp = now.toISOString();
+  const timestampDisplay = now.toLocaleTimeString();
   const scanLabel = scanCount > 0 ? ` #${scanCount}` : '';
-  console.log(`\n[${timestamp}] 🔄 Fetching quotes${scanLabel}...`);
+  console.log(`\n[${timestampDisplay}] 🔄 Fetching quotes${scanLabel}...`);
   const scanStart = Date.now();
 
   const [feeData, blockNumber] = await Promise.all([
@@ -146,7 +151,7 @@ async function scan(provider, scanCount = 0, prevPrices = {}) {
   displayQuotes(quotes, amountIn, prevPrices);
 
   const arbitrage = calculateArbitrage(quotes, gasPrice, QUOTE_CONFIG.estimatedGasUnits);
-  const netProfit = displayArbitrage(arbitrage, amountIn);
+  const arbResult = displayArbitrage(arbitrage, amountIn);
 
   const elapsed = (Date.now() - scanStart) / 1000;
   console.log(`\n⏱  Scan completed in ${elapsed.toFixed(1)}s`);
@@ -159,16 +164,34 @@ async function scan(provider, scanCount = 0, prevPrices = {}) {
     }
   });
 
-  let spreadPct = null;
-  if (arbitrage && arbitrage.profitBeforeGas > 0n) {
-    const buyQ  = arbitrage.quotes.find(q => q.dex === arbitrage.buyFrom);
-    const sellQ = arbitrage.quotes.find(q => q.dex === arbitrage.sellTo);
-    if (buyQ && sellQ && buyQ.amountOut > 0n) {
-      spreadPct = (Number(sellQ.amountOut - buyQ.amountOut) / Number(buyQ.amountOut)) * 100;
-    }
-  }
+  const netProfit = arbResult?.netProfit ?? null;
+  const spreadPct = arbResult?.spreadPct ?? null;
 
-  return { netProfit, elapsed, prices, spreadPct };
+  const logEntry = {
+    scanNumber: scanCount,
+    timestamp,
+    block: blockNumber,
+    gasGwei: Number(ethers.formatUnits(gasPrice, 'gwei')),
+    quotes: quotes.map(q => ({
+      dex: q.dex,
+      fee: q.fee ?? null,
+      amountOutUsdc: q.amountOut > 0n ? Number(ethers.formatUnits(q.amountOut, 6)) : null,
+      pricePerWeth: prices[q.dex] ?? null,
+    })),
+    arbitrage: arbResult ? {
+      buyFrom: arbitrage.buyFrom,
+      sellTo: arbitrage.sellTo,
+      spreadPct: arbResult.spreadPct,
+      profitBeforeGasUsdc: arbResult.profitBeforeGasUsdc,
+      gasCostEth: arbResult.gasCostEth,
+      gasCostUsdc: arbResult.gasCostUsdc,
+      netProfitUsdc: arbResult.netProfit,
+      profitable: arbResult.netProfit !== null && arbResult.netProfit >= QUOTE_CONFIG.minProfitUSD,
+    } : null,
+    elapsedSec: elapsed,
+  };
+
+  return { netProfit, elapsed, prices, spreadPct, logEntry };
 }
 
 function displaySummary(stats) {
@@ -209,6 +232,8 @@ async function main() {
   if (QUOTE_CONFIG.scanIntervalMs > 0) {
     console.log(`Interval: ${QUOTE_CONFIG.scanIntervalMs / 1000}s`);
   }
+  const logFilePath = await initLogger(LOG_CONFIG.logDir);
+  console.log(`Log: ${logFilePath}`);
   console.log(HEADER);
 
   const provider = new ethers.JsonRpcProvider(BASE_CONFIG.rpcUrl);
@@ -232,6 +257,7 @@ async function main() {
     while (true) {
       try {
         const result = await scan(provider, ++scanCount, prevPrices);
+        await logScan(result.logEntry);
         stats.totalScans++;
         stats.totalElapsed += result.elapsed;
         prevPrices = result.prices;
@@ -258,7 +284,8 @@ async function main() {
     }
   } else {
     try {
-      await scan(provider);
+      const result = await scan(provider);
+      await logScan(result.logEntry);
     } catch (error) {
       console.error('\n❌ Error:', error.message);
       if (error.code === 'NETWORK_ERROR') {

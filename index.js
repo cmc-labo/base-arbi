@@ -3,6 +3,7 @@ import { ethers } from 'ethers';
 import { BASE_CONFIG, TOKENS, QUOTE_CONFIG, LOG_CONFIG } from './config.js';
 import { getAllQuotes, calculateArbitrage } from './quoter.js';
 import { initLogger, logScan } from './logger.js';
+import { notifyProfitableArbitrage } from './notifier.js';
 
 const SEPARATOR = '─'.repeat(70);
 const HEADER   = '═'.repeat(70);
@@ -152,6 +153,16 @@ async function scan(provider, scanCount = 0, prevPrices = {}) {
 
   const arbitrage = calculateArbitrage(quotes, gasPrice, QUOTE_CONFIG.estimatedGasUnits);
   const arbResult = displayArbitrage(arbitrage, amountIn);
+
+  if (arbResult && arbResult.netProfit !== null && arbResult.netProfit >= QUOTE_CONFIG.minProfitUSD) {
+    await notifyProfitableArbitrage({
+      buyFrom: arbitrage.buyFrom,
+      sellTo: arbitrage.sellTo,
+      netProfit: arbResult.netProfit,
+      spreadPct: arbResult.spreadPct,
+      minProfitUSD: QUOTE_CONFIG.minProfitUSD,
+    });
+  }
 
   const elapsed = (Date.now() - scanStart) / 1000;
   console.log(`\n⏱  Scan completed in ${elapsed.toFixed(1)}s`);

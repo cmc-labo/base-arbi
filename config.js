@@ -32,6 +32,11 @@ export const LOG_CONFIG = {
   logDir: process.env.LOG_DIR || 'logs',
 };
 
+// Notification Configuration
+export const NOTIFY_CONFIG = {
+  discordWebhookUrl: process.env.DISCORD_WEBHOOK_URL || '',
+};
+
 // Quote Configuration
 export const QUOTE_CONFIG = {
   // Amount of WETH to quote (in ether units)

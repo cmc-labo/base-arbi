@@ -11,6 +11,7 @@ Base チェーン上の WETH/USDC ペアの価格差を監視し、アービト�
 - ✅ **価格トレンド表示**: 前回スキャンとの差額を ▲/▼ で表示
 - ✅ **スプレッド%**: 裁定機会の規模をパーセントで表示
 - ✅ **セッションサマリー**: Ctrl+C 終了時に合計スキャン数・最良利益・最大スプレッドを表示
+- ✅ **Discord通知**: しきい値を超える利益機会を検出したら Discord Webhook で通知（任意）
 
 ## 対応DEX
 
@@ -48,6 +49,9 @@ MIN_PROFIT_USD=10
 
 # スキャン間隔（ミリ秒）。0 を指定すると1回だけ実行して終了
 SCAN_INTERVAL_MS=30000
+
+# 利益機会を検出したときの Discord 通知先（任意。空欄なら通知しない）
+DISCORD_WEBHOOK_URL=
 ```
 
 ### 3. 実行
@@ -62,6 +66,7 @@ npm start
 arbitrage/
 ├── config.js       # 設定ファイル（トークンアドレス、DEX設定）
 ├── quoter.js       # クォーター機能（見積もり取得）
+├── logger.js       # スキャン結果のJSONログ出力
 ├── index.js        # メインスクリプト
 ├── package.json    # プロジェクト設定
 ├── .env.example    # 環境変数のサンプル
@@ -213,6 +218,17 @@ SCAN_INTERVAL_MS=0      # 1回だけ実行して終了
 ### 他のDEXを追加
 
 `config.js` と `quoter.js` を編集して、他のDEXを追加できます。
+
+### Discord通知の設定
+
+1. Discordのチャンネル設定 → 連携サービス → ウェブフックから Webhook URL を発行
+2. `.env` に設定:
+
+```env
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/xxxx/yyyy
+```
+
+`MIN_PROFIT_USD` を超える純利益を検出したスキャンごとに通知が送られます（空欄の場合は通知しません）。
 
 ## トラブルシューティング
 
